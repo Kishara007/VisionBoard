@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision Board Slideshow</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            /* 3D gradient background with animated light */
+            background: linear-gradient(135deg, #232526 0%, #414345 100%),
+                radial-gradient(ellipse at 60% 40%, #8ec5fc 0%, #e0c3fc 40%, transparent 80%),
+                radial-gradient(ellipse at 30% 70%, #f093fb 0%, #f5576c 60%, transparent 100%),
+                radial-gradient(ellipse at 80% 80%, #43e97b 0%, #38f9d7 60%, transparent 100%);
+            background-blend-mode: screen, lighten, lighten, normal;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            animation: bgmove 16s ease-in-out infinite alternate;
+        }
+        @keyframes bgmove {
+            0% {
+                background-position: 0% 0%, 60% 40%, 30% 70%, 80% 80%;
+            }
+            100% {
+                background-position: 100% 100%, 70% 60%, 40% 80%, 90% 90%;
+            }
+        }
+        .slideshow-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: repeating-linear-gradient(135deg, #e0c3fc 0px, #8ec5fc 400px, #f093fb 800px, #e0c3fc 1200px);
+            overflow: hidden;
+            z-index: 1;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 0 0 0;
+            box-sizing: border-box;
+        }
+        .slideshow-image {
+            width: 340px;
+            height: 340px;
+            object-fit: cover;
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 6px 32px #0003, 0 1.5px 8px #fff8 inset;
+            margin: 18px 18px 0 0;
+            border: 6px solid #fff;
+            opacity: 1;
+            position: relative;
+            transition: opacity 1s, transform 0.7s cubic-bezier(.4,0,.2,1);
+            transform: scale(0.96) rotate(-2deg);
+            z-index: 1;
+            /* Remove display: none; so images can be shown by JS */
+        }
+        .slideshow-image.active {
+            z-index: 2;
+            transform: scale(1.04) rotate(1deg);
+            box-shadow: 0 12px 48px #0005, 0 2px 16px #fff8 inset;
+            border-color: #ffe082;
+        }
+        /* Pin/clip style for one image */
+        .slideshow-image.pin {
+            box-shadow: 0 12px 48px #0005, 0 2px 16px #fff8 inset, 0 -8px 0 #ffe082;
+            border-top: 12px solid #ffe082;
+            position: relative;
+        }
+        /* Slight rotation for collage effect */
+        .slideshow-image.rotate1 { transform: rotate(-3deg); }
+        .slideshow-image.rotate2 { transform: rotate(2deg); }
+        .slideshow-image.rotate3 { transform: rotate(-1.5deg); }
+        .slideshow-image.rotate4 { transform: rotate(1.5deg); }
+        .slideshow-image.rotate5 { transform: rotate(-2.5deg); }
+        .slideshow-image.rotate6 { transform: rotate(2.5deg); }
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .slideshow-image { width: 220px; height: 220px; }
+        }
+        @media (max-width: 700px) {
+            .slideshow-image { width: 120px; height: 120px; margin: 8px 8px 0 0; border-width: 3px; }
+            .slideshow-container { padding-top: 10px; }
+        }
+        .dots {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 10;
+            padding: 10px 30px;
+            background: rgba(30,30,40,0.35);
+            border-radius: 20px;
+            box-shadow: 0 2px 16px #0004;
+            backdrop-filter: blur(4px);
+        }
+        .dot {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            margin: 0 7px;
+            background: linear-gradient(135deg, #fff6 0%, #fff 100%);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px #0003;
+            border: 2px solid #fff6;
+            transition: background 0.3s, transform 0.2s, border 0.3s;
+        }
+        .dot.active {
+            background: linear-gradient(135deg, #ffeb3b 0%, #fffde4 100%);
+            border: 2px solid #ffeb3b;
+            transform: scale(1.2);
+            box-shadow: 0 4px 16px #ffeb3b55;
+        }
+    </style>
+</head>
+<body>
+    <audio id="bg-music" src="1.mp3" autoplay loop muted style="display:none;"></audio>
+    <div class="slideshow-container" id="slideshow"></div>
+    <div class="dots" id="dots"></div>
+    <script>
+        // Play background music and allow it to continue if user interacts
+        const bgMusic = document.getElementById('bg-music');
+        // Try to play on load (muted)
+        bgMusic.play().catch(() => {});
+        // On first user interaction, unmute and play
+        document.addEventListener('click', () => {
+            bgMusic.muted = false;
+            bgMusic.play();
+        }, { once: true });
+        const imageFiles = [
+            '1.png', '2.png', '3.png', '4.png', '5.png',
+            '6.png', '7.png', '8.png', '9.png', '10.png', '11.png',
+            '12.png', '13.png', '14.png'
+        ];
+        const slideshow = document.getElementById('slideshow');
+        const dotsContainer = document.getElementById('dots');
+        let current = 0;
+        let images = [];
+        let dots = [];
+
+        // Create image elements with collage effect
+        const rotations = ['rotate1', 'rotate2', 'rotate3', 'rotate4', 'rotate5', 'rotate6'];
+        imageFiles.forEach((src, idx) => {
+            const img = document.createElement('img');
+            img.src = src;
+            let extraClass = rotations[idx % rotations.length];
+            img.className = 'slideshow-image ' + extraClass;
+            slideshow.appendChild(img);
+            images.push(img);
+        });
+
+        // Show 6 images at a time, 2 rows of 3 images each
+        let currentStart = 0;
+        const cardsToShow = 6;
+
+        // Arrange images in two rows of 3
+        function updateVisibleCards() {
+            // Creative animation: two rows, images animate in
+            slideshow.innerHTML = '';
+            let rowDivs = [];
+            for (let row = 0; row < 2; row++) {
+                let rowDiv = document.createElement('div');
+                rowDiv.style.display = 'flex';
+                rowDiv.style.justifyContent = 'center';
+                rowDiv.style.marginBottom = '18px';
+                rowDivs.push(rowDiv);
+                slideshow.appendChild(rowDiv);
+            }
+            for (let i = 0; i < cardsToShow; i++) {
+                let idx = (currentStart + i) % images.length;
+                let img = images[idx];
+                let row = Math.floor(i / 3);
+                rowDivs[row].appendChild(img);
+                img.style.visibility = 'visible';
+                img.style.opacity = '1';
+                img.classList.remove('sideshow-img');
+                img.style.transition = 'transform 0.7s cubic-bezier(.4,0,.2,1), opacity 0.7s';
+                img.style.transform = 'scale(0.8) rotate(' + ((row === 0 ? -1 : 1) * (i % 3 - 1) * 10) + 'deg)';
+                img.style.width = '340px';
+                img.style.height = '340px';
+                setTimeout(() => {
+                    img.style.transform = 'scale(1.0) rotate(0deg)';
+                }, 100 + i * 120);
+            }
+            // Hide the rest
+            images.forEach((img, idx) => {
+                let show = false;
+                for (let i = 0; i < cardsToShow; i++) {
+                    if ((currentStart + i) % images.length === idx) show = true;
+                }
+                if (!show) {
+                    img.style.visibility = 'hidden';
+                    img.style.opacity = '0';
+                    img.classList.remove('sideshow-img');
+                    img.style.transition = '';
+                    img.style.transform = '';
+                    img.style.width = '';
+                    img.style.height = '';
+                }
+            });
+            // Dots
+            dotsContainer.innerHTML = '';
+            for (let i = 0; i < imageFiles.length; i += cardsToShow) {
+                const dot = document.createElement('span');
+                dot.className = 'dot' + (i === currentStart ? ' active' : '');
+                dot.onclick = () => showSlide(i);
+                dotsContainer.appendChild(dot);
+            }
+        }
+
+        // Sideshow animation for each image
+        function showSideshowImages(callback) {
+            let i = 0;
+            function showNext() {
+                if (i >= cardsToShow) {
+                    // Restore grid after all images
+                    if (callback) setTimeout(callback, 500);
+                    return;
+                }
+                // Remove all children first
+                slideshow.innerHTML = '';
+                let idx = (currentStart + i) % images.length;
+                let img = images[idx];
+                img.style.visibility = 'visible';
+                img.style.opacity = '1';
+                img.classList.add('sideshow-img');
+                img.style.transition = 'none';
+                img.style.transform = 'translateX(100vw) scale(1.0)';
+                img.style.zIndex = 10;
+                // Make image bigger for sideshow
+                img.style.width = 'min(70vw, 70vh)';
+                img.style.height = 'min(70vw, 70vh)';
+                img.style.display = 'block';
+                img.style.margin = '40px auto 0 auto';
+                slideshow.appendChild(img);
+                // Animate in and scale up
+                setTimeout(() => {
+                    img.style.transition = 'transform 0.7s cubic-bezier(.4,0,.2,1), width 0.7s, height 0.7s';
+                    img.style.transform = 'translateX(0) scale(1.18)';
+                    img.style.width = 'min(80vw, 80vh)';
+                    img.style.height = 'min(80vw, 80vh)';
+                    img.style.margin = '40px auto 0 auto';
+                    // After 5s, animate out
+                    setTimeout(() => {
+                        img.style.transition = 'transform 0.7s cubic-bezier(.4,0,.2,1), width 0.7s, height 0.7s';
+                        img.style.transform = 'translateX(-100vw) scale(1.18)';
+                        img.style.width = 'min(70vw, 70vh)';
+                        img.style.height = 'min(70vw, 70vh)';
+                        img.style.margin = '40px auto 0 auto';
+                        setTimeout(() => {
+                            img.style.visibility = 'hidden';
+                            img.style.opacity = '0';
+                            img.classList.remove('sideshow-img');
+                            img.style.transition = '';
+                            img.style.transform = '';
+                            img.style.width = '';
+                            img.style.height = '';
+                            img.style.zIndex = '';
+                            img.style.margin = '';
+                            i++;
+                            showNext();
+                        }, 700);
+                    }, 5000);
+                }, 50);
+            }
+            showNext();
+        }
+
+        let slideshowMode = 'grid'; // 'grid' or 'sideshow'
+        let intervalId = null;
+
+        function startGridMode() {
+            slideshowMode = 'grid';
+            updateVisibleCards();
+            if (intervalId) clearInterval(intervalId);
+            intervalId = setInterval(() => {
+                startSideshowMode();
+            }, 5000);
+        }
+
+        function startSideshowMode() {
+            slideshowMode = 'sideshow';
+            if (intervalId) clearInterval(intervalId);
+            showSideshowImages(() => {
+                // After sideshow, go to next grid
+                let next = currentStart + cardsToShow;
+                if (next >= images.length) {
+                    next = 0;
+                }
+                currentStart = next;
+                startGridMode();
+            });
+        }
+
+        function showSlide(idx) {
+            currentStart = idx;
+            startGridMode();
+        }
+
+        // Initialize
+        startGridMode();
+    </script>
+</body>
+</html>
